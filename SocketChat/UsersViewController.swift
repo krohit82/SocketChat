@@ -7,21 +7,36 @@
 //
 
 import UIKit
+import MapKit
 
-class UsersViewController: UIViewController, UITableViewDelegate, UITableViewDataSource {
+class UsersViewController: UIViewController, UITableViewDelegate, UITableViewDataSource, MKMapViewDelegate, CLLocationManagerDelegate {
 
     @IBOutlet weak var tblUserList: UITableView!
-    
+    @IBOutlet weak var mapView: MKMapView!
     
     var users = [[String: AnyObject]]()
-    
     var nickname: String!
-    
     var configurationOK = false
+    let locationManager = CLLocationManager()
     
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        
+        locationManager.delegate = self;
+        locationManager.desiredAccuracy = kCLLocationAccuracyBest
+        locationManager.distanceFilter = kCLLocationAccuracyNearestTenMeters;
+        locationManager.requestAlwaysAuthorization()
+        locationManager.startUpdatingLocation()
+        
+        
+        // 3. setup mapView
+        mapView.delegate = self
+        mapView.showsUserLocation = true
+        mapView.userTrackingMode = .Follow
+        
+        setupData()
 
         // Do any additional setup after loading the view.
     }
@@ -77,6 +92,24 @@ class UsersViewController: UIViewController, UITableViewDelegate, UITableViewDat
         if nickname == nil {
             askForNickname()
         }
+        
+        // 1. status is not determined
+        if CLLocationManager.authorizationStatus() == .NotDetermined {
+            locationManager.requestAlwaysAuthorization()
+        }
+            // 2. authorization were denied
+        else if CLLocationManager.authorizationStatus() == .Denied {
+            
+            let alert = UIAlertView()
+            alert.title = "Alert"
+            alert.message = "Location services were previously denied. Please enable location services for this app in Settings."
+            alert.addButtonWithTitle("Understod")
+            alert.show()
+        }
+            // 3. we do have authorization
+        else if CLLocationManager.authorizationStatus() == .AuthorizedAlways {
+            locationManager.startUpdatingLocation()
+        }
     }
     
     
@@ -85,7 +118,42 @@ class UsersViewController: UIViewController, UITableViewDelegate, UITableViewDat
         // Dispose of any resources that can be recreated.
     }
     
-
+    func setupData() {
+        // 1. check if system can monitor regions
+        if CLLocationManager.isMonitoringAvailableForClass(CLCircularRegion.self) {
+            
+            // 2. region data
+            let title = "Rohit"
+            let coordinate = CLLocationCoordinate2DMake((locationManager.location?.coordinate.latitude)!, (locationManager.location?.coordinate.longitude)!)
+            let regionRadius = 300.0
+            
+            // 3. setup region
+            let region = CLCircularRegion(center: CLLocationCoordinate2D(latitude: coordinate.latitude,
+                longitude: coordinate.longitude), radius: regionRadius, identifier: title)
+            locationManager.startMonitoringForRegion(region)
+            
+            // 4. setup annotation
+            let restaurantAnnotation = MKPointAnnotation()
+            restaurantAnnotation.coordinate = coordinate;
+            restaurantAnnotation.title = "\(title)";
+            mapView.addAnnotation(restaurantAnnotation)
+            
+            // 5. setup circle
+            let circle = MKCircle(centerCoordinate: coordinate, radius: regionRadius)
+            mapView.addOverlay(circle)
+        }
+        else {
+            print("System can't track regions")
+        }
+    }
+    
+    // 6. draw circle
+    func mapView(mapView: MKMapView, rendererForOverlay overlay: MKOverlay) -> MKOverlayRenderer {
+        let circleRenderer = MKCircleRenderer(overlay: overlay)
+        circleRenderer.strokeColor = UIColor.redColor()
+        circleRenderer.lineWidth = 1.0
+        return circleRenderer
+    }
 
     // MARK: - Navigation
 
@@ -113,6 +181,25 @@ class UsersViewController: UIViewController, UITableViewDelegate, UITableViewDat
             })
         }
         
+    }
+    
+    func locationManager(manager: CLLocationManager, didEnterRegion region: CLRegion) {
+        
+        let alert = UIAlertView()
+        alert.title = "Alert"
+        alert.message = "enter \(region.identifier)"
+        alert.addButtonWithTitle("Understod")
+        alert.show()
+        
+    }
+    
+    // 2. user exit region
+    func locationManager(manager: CLLocationManager, didExitRegion region: CLRegion) {
+        let alert = UIAlertView()
+        alert.title = "Alert"
+        alert.message = "Exit \(region.identifier)"
+        alert.addButtonWithTitle("Understod")
+        alert.show()
     }
 
     
